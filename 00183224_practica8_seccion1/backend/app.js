@@ -13,6 +13,15 @@ const JWT_SECRET = "your_jwt_secret"; // Use a strong, secure key in production
 app.use(bodyParser.json());
 app.use(cors());
 
+const generarHashEjemplo = async () => {
+  const saltRounds = 10;
+  const plainTextPassword = "1234";
+  const hash = await bcrypt.hash(plainTextPassword, saltRounds);
+  console.log(`Hashed password for '${plainTextPassword}': ${hash}`);
+};
+
+generarHashEjemplo();
+
 const users = []; // Dummy database (use a real DB in production)
 
 // Middleware: Verify Token
