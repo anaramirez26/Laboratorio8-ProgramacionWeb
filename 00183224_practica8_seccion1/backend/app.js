@@ -5,7 +5,7 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import bodyParser from "body-parser";
 import cors from "cors";
-
+import { pool } from './data/connection.js';
 const app = express();
 const PORT = 5000;
 const JWT_SECRET = "your_jwt_secret"; // Use a strong, secure key in production
@@ -38,27 +38,44 @@ const verifyToken = (req, res, next) => {
 };
 
 // Routes
+// app.js
+
 app.post("/signin", async (req, res) => {
-  const { email, password } = req.body;
-  const user = users.find((u) => u.email === email);
-  if (!user) return res.status(404).json({ message: "User not found" });
+    // CAMBIO 1: Aquí debe decir 'passwd'
+    const { email, passwd } = req.body;
 
-  const isPasswordValid = await bcrypt.compare(password, user.password);
-  if (!isPasswordValid) return res.status(400).json({ message: "Invalid credentials" });
+    try {
+        const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: "User not found" });
+        }
+        
+        const user = result.rows[0];
 
-  const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: "1h" });
-  res.status(200).json({ token });
+        // CAMBIO 2: Aquí también debe decir 'passwd'
+        const isPasswordValid = await bcrypt.compare(passwd, user.password);
+        
+        if (!isPasswordValid) {
+            return res.status(400).json({ message: "Invalid credentials" });
+        }
+
+        const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: "1h" });
+        
+        res.status(200).json({ token });
+
+    } catch (error) {
+        console.error("Error during signin:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
 });
 
-app.get("/protected", verifyToken, (req, res) => {
-  res.status(200).json({ message: "Protected data accessed", user: req.user });
-});
+app.get("/users", verifyToken, controllers.getUsers);
+app.get("/users/:id", verifyToken, controllers.getUserById);
+app.post("/users", verifyToken, controllers.createUser);
+app.put("/users/:id", verifyToken, controllers.updateUser);
+app.delete("/users/:id", verifyToken, controllers.deleteUser);
 
-app.get("/users", controllers.getUsers);
-app.get("/users/:id", controllers.getUserById);
-app.post("/users", controllers.createUser);
-app.put("/users/:id", controllers.updateUser);
-app.delete("/users/:id", controllers.deleteUser);
 
 app.listen(PORT, () => console.log(`Server running at http://localhost:${PORT}`)
 );
